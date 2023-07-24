@@ -218,11 +218,25 @@ class SuperPoint(nn.Module):
         """ Perform extraction with online resizing"""
         if img.dim() == 3:
             img = img[None]  # add batch dim
-        assert img.dim() == 4 and img.shape[0] == 1
+        assert img.dim() == 4
+        batch_size = img.shape[0]
         shape = img.shape[-2:][::-1]
         img, scales = ImagePreprocessor(
             **{**self.preprocess_conf, **conf})(img)
         feats = self.forward({'image': img})
         feats['image_size'] = torch.tensor(shape)[None].to(img).float()
         feats['keypoints'] = (feats['keypoints'] + .5) / scales[None] - .5
-        return feats
+
+        if img.shape[0] == 1:
+            return feats
+        else:
+            feats_batch = []
+            for i in range(batch_size):
+                feats_batch.append({
+                    'keypoints': feats['keypoints'][i][None],
+                    'keypoint_scores': feats['keypoint_scores'][i][None],
+                    'descriptors': feats['descriptors'][i][None],
+                    'image_size': feats['image_size']
+                })
+
+            return feats_batch
